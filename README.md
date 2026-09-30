@@ -6,7 +6,7 @@ The action uses the AWS SDK default credential provider chain. In GitHub Actions
 
 ## Usage
 
-Store the App ID or Client ID, KMS key ARN, installation ID, and role ARN as GitHub Actions variables. They are identifiers, not private keys. Pin all third-party actions to immutable commits in production.
+Store the App ID or Client ID, KMS key ARN, and role ARN as GitHub Actions variables. They are identifiers, not private keys. By default, the action resolves the GitHub App installation for the repository running the workflow. Pin all third-party actions to immutable commits in production.
 
 ```yaml
 name: Use GitHub App token from KMS
@@ -32,7 +32,6 @@ jobs:
         uses: debank/create-github-app-token-kms@v1
         with:
           app-id: ${{ vars.GITHUB_APP_CLIENT_ID }}
-          installation-id: ${{ vars.GITHUB_APP_INSTALLATION_ID }}
           kms-key-id: ${{ vars.GITHUB_APP_KMS_KEY_ARN }}
           aws-region: ap-southeast-1
           permissions: '{"contents":"read"}'
@@ -44,6 +43,8 @@ jobs:
         run: gh api repos/debank/private-repository
 ```
 
+When the workflow operates on the current repository, omit both `installation-id` and `repository`. To create a token for another repository, pass `repository: owner/repository`; to select a specific installation explicitly, pass `installation-id`. At least one of `installation-id`, `repository`, or `GITHUB_REPOSITORY` must be available.
+
 The action masks both the transient App JWT and the installation token. Do not print the output token in workflow logs.
 
 ## Inputs
@@ -51,7 +52,8 @@ The action masks both the transient App JWT and the installation token. Do not p
 | Input | Required | Description |
 | --- | --- | --- |
 | `app-id` | Yes | GitHub App client ID (recommended) or app ID used as the JWT `iss` claim. |
-| `installation-id` | Yes | GitHub App installation ID for the requested token. |
+| `installation-id` | No | GitHub App installation ID. If omitted, the action resolves the installation for `repository` or `GITHUB_REPOSITORY`. |
+| `repository` | No | `OWNER/REPOSITORY` used to resolve an installation when `installation-id` is omitted. Defaults to `GITHUB_REPOSITORY`. |
 | `kms-key-id` | Yes | KMS key ARN, alias ARN, alias name, or key ID. |
 | `aws-region` | Yes | Region containing the KMS key. |
 | `github-api-url` | No | GitHub REST API base URL; defaults to `GITHUB_API_URL` or `https://api.github.com`. Supports GitHub Enterprise Server API URLs such as `https://github.example/api/v3`. |

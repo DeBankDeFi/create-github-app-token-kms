@@ -1,7 +1,10 @@
 import * as core from "@actions/core";
 import { KMSClient } from "@aws-sdk/client-kms";
 
-import { createInstallationToken } from "./github.js";
+import {
+  createInstallationToken,
+  getInstallationIdForRepository,
+} from "./github.js";
 import { createAppJwt } from "./jwt.js";
 
 function optionalJsonObjectInput(name) {
@@ -44,7 +47,14 @@ function optionalJsonStringArrayInput(name) {
 
 export async function run() {
   const appId = core.getInput("app-id", { required: true });
-  const installationId = core.getInput("installation-id", { required: true });
+  const explicitInstallationId = core.getInput("installation-id");
+  const repository = core.getInput("repository") || process.env.GITHUB_REPOSITORY;
+  if (!explicitInstallationId && !repository) {
+    throw new Error(
+      "Provide 'installation-id' or 'repository', or run the action where GITHUB_REPOSITORY is set.",
+    );
+  }
+
   const kmsKeyId = core.getInput("kms-key-id", { required: true });
   const region = core.getInput("aws-region", { required: true });
   const apiUrl =
@@ -52,6 +62,9 @@ export async function run() {
 
   const kmsClient = new KMSClient({ region });
   const { jwt } = await createAppJwt({ appId, kmsKeyId, kmsClient });
+  const installationId =
+    explicitInstallationId ||
+    (await getInstallationIdForRepository({ appJwt: jwt, repository, apiUrl }));
   const { token, expiresAt } = await createInstallationToken({
     appJwt: jwt,
     installationId,
