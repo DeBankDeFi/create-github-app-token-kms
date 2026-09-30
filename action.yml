@@ -10,8 +10,11 @@ inputs:
     description: GitHub App client ID (recommended) or app ID used as the JWT issuer.
     required: true
   installation-id:
-    description: GitHub App installation ID for which to create a token.
-    required: true
+    description: Optional GitHub App installation ID. If omitted, the action resolves the installation for repository or GITHUB_REPOSITORY.
+    required: false
+  repository:
+    description: Optional OWNER/REPOSITORY used to resolve the installation when installation-id is omitted. Defaults to GITHUB_REPOSITORY.
+    required: false
   kms-key-id:
     description: ARN, alias ARN, alias name, or key ID of the asymmetric AWS KMS signing key.
     required: true

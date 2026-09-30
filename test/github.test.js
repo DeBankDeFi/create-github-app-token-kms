@@ -1,7 +1,42 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createInstallationToken } from "../src/github.js";
+import {
+  createInstallationToken,
+  getInstallationIdForRepository,
+} from "../src/github.js";
+test("resolves the installation ID for a repository", async () => {
+  let request;
+  const installationId = await getInstallationIdForRepository({
+    appJwt: "header.payload.signature",
+    repository: "debank/private-repository",
+    apiUrl: "https://github.example/api/v3",
+    fetchImplementation: async (url, options) => {
+      request = { url, options };
+      return new Response(JSON.stringify({ id: 12345 }), { status: 200 });
+    },
+  });
+
+  assert.equal(installationId, "12345");
+  assert.equal(
+    request.url,
+    "https://github.example/api/v3/repos/debank/private-repository/installation",
+  );
+  assert.equal(request.options.method, "GET");
+  assert.equal(request.options.headers.Authorization, "Bearer header.payload.signature");
+});
+
+test("rejects an invalid repository identifier before calling GitHub", async () => {
+  await assert.rejects(
+    getInstallationIdForRepository({
+      appJwt: "jwt",
+      repository: "not-a-repository",
+      apiUrl: "https://api.github.com",
+    }),
+    /OWNER\/REPOSITORY/,
+  );
+});
+
 
 test("exchanges an app JWT and forwards optional installation token restrictions", async () => {
   let request;

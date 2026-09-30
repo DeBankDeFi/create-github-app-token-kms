@@ -57628,12 +57628,61 @@ var dist_cjs = __nccwpck_require__(2632);
 const API_VERSION = "2026-03-10";
 const USER_AGENT = "create-github-app-token-kms";
 
-function installationTokenUrl(apiUrl, installationId) {
+function apiUrlFor(apiUrl, path) {
   const normalizedApiUrl = apiUrl.endsWith("/") ? apiUrl : `${apiUrl}/`;
-  return new URL(
-    `app/installations/${encodeURIComponent(installationId)}/access_tokens`,
-    normalizedApiUrl,
-  ).toString();
+  return new URL(path, normalizedApiUrl).toString();
+}
+
+function githubHeaders(appJwt) {
+  return {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${appJwt}`,
+    "User-Agent": USER_AGENT,
+    "X-GitHub-Api-Version": API_VERSION,
+  };
+}
+
+/**
+ * Resolves the GitHub App installation for an OWNER/REPOSITORY string.
+ *
+ * @param {{ appJwt: string, repository: string, apiUrl: string, fetchImplementation?: typeof fetch }} options
+ * @returns {Promise<string>}
+ */
+async function getInstallationIdForRepository({
+  appJwt,
+  repository,
+  apiUrl,
+  fetchImplementation = fetch,
+}) {
+  const [owner, repositoryName, ...remainingParts] = repository.split("/");
+  if (!owner || !repositoryName || remainingParts.length > 0) {
+    throw new Error("Repository must use the OWNER/REPOSITORY format.");
+  }
+
+  const response = await fetchImplementation(
+    apiUrlFor(
+      apiUrl,
+      `repos/${encodeURIComponent(owner)}/${encodeURIComponent(repositoryName)}/installation`,
+    ),
+    {
+      method: "GET",
+      headers: githubHeaders(appJwt),
+    },
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(
+      `GitHub installation lookup for '${repository}' failed (${response.status}): ${responseText}`,
+    );
+  }
+
+  const result = await response.json();
+  if (typeof result.id !== "number" && typeof result.id !== "string") {
+    throw new Error(`GitHub installation lookup for '${repository}' returned no installation ID.`);
+  }
+
+  return String(result.id);
 }
 
 /**
@@ -57659,15 +57708,10 @@ async function createInstallationToken({
   }
 
   const response = await fetchImplementation(
-    installationTokenUrl(apiUrl, installationId),
+    apiUrlFor(apiUrl, `app/installations/${encodeURIComponent(installationId)}/access_tokens`),
     {
       method: "POST",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${appJwt}`,
-        "User-Agent": USER_AGENT,
-        "X-GitHub-Api-Version": API_VERSION,
-      },
+      headers: githubHeaders(appJwt),
       body: JSON.stringify(body),
     },
   );
@@ -57782,7 +57826,14 @@ function optionalJsonStringArrayInput(name) {
 
 async function run() {
   const appId = getInput("app-id", { required: true });
-  const installationId = getInput("installation-id", { required: true });
+  const explicitInstallationId = getInput("installation-id");
+  const repository = getInput("repository") || process.env.GITHUB_REPOSITORY;
+  if (!explicitInstallationId && !repository) {
+    throw new Error(
+      "Provide 'installation-id' or 'repository', or run the action where GITHUB_REPOSITORY is set.",
+    );
+  }
+
   const kmsKeyId = getInput("kms-key-id", { required: true });
   const region = getInput("aws-region", { required: true });
   const apiUrl =
@@ -57790,6 +57841,9 @@ async function run() {
 
   const kmsClient = new dist_cjs/* KMSClient */.pgq({ region });
   const { jwt } = await createAppJwt({ appId, kmsKeyId, kmsClient });
+  const installationId =
+    explicitInstallationId ||
+    (await getInstallationIdForRepository({ appJwt: jwt, repository, apiUrl }));
   const { token, expiresAt } = await createInstallationToken({
     appJwt: jwt,
     installationId,
