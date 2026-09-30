@@ -1,0 +1,39 @@
+name: Create GitHub App token with AWS KMS
+description: Create a GitHub App installation access token by signing its JWT with AWS KMS.
+author: DeBank
+branding:
+  icon: key
+  color: yellow
+
+inputs:
+  app-id:
+    description: GitHub App client ID (recommended) or app ID used as the JWT issuer.
+    required: true
+  installation-id:
+    description: GitHub App installation ID for which to create a token.
+    required: true
+  kms-key-id:
+    description: ARN, alias ARN, alias name, or key ID of the asymmetric AWS KMS signing key.
+    required: true
+  aws-region:
+    description: AWS Region that contains the KMS key.
+    required: true
+  github-api-url:
+    description: GitHub REST API base URL. Defaults to GITHUB_API_URL or https://api.github.com.
+    required: false
+  permissions:
+    description: Optional JSON object that narrows the installation token permissions, for example {"contents":"read"}.
+    required: false
+  repositories:
+    description: Optional JSON array of repository names that narrows the installation token, for example ["repo-a","repo-b"].
+    required: false
+
+outputs:
+  token:
+    description: GitHub App installation access token. The action masks it before setting this output.
+  expires-at:
+    description: ISO 8601 expiration time returned by GitHub.
+
+runs:
+  using: node20
+  main: dist/index.js

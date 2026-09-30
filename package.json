@@ -1,0 +1,23 @@
+{
+  "name": "create-github-app-token-kms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Action that creates a GitHub App installation token with AWS KMS signing",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "ncc build src/main.js --license licenses.txt",
+    "test": "node --test",
+    "check": "npm run test && npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1",
+    "@aws-sdk/client-kms": "3.1143.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "0.45.0"
+  }
+}
